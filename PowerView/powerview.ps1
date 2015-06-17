@@ -10610,12 +10610,13 @@ function Invoke-FindUserTrustGroups {
         $DistinguishedDomainName = "DC=" + $Domain -replace '\.',',DC='
     }
     else {
-        $DistinguishedDomainName = [string] ([adsi]'').distinguishedname
-        $Domain = $DistinguishedDomainName -replace 'DC=','' -replace ',','.'
+        $DomainObj = Get-NetDomain
+        $DistinguishedDomainName = $DomainObj.GetDirectoryEntry().distinguishedName
+        $Domain = $DomainObj.Name
     }
 
     # query for the primary domain controller so we can extract the domain SID for filtering
-    $PrimaryDC = (Get-NetDomain -Domain $Domain).PdcRoleOwner
+    $PrimaryDC = $DomainObj.PdcRoleOwner
     $PrimaryDCSID = (Get-NetComputers -Domain $Domain -Hostname $PrimaryDC -FullData).objectsid
     $parts = $PrimaryDCSID.split("-")
     $DomainSID = $parts[0..($parts.length -2)] -join "-"
@@ -10664,10 +10665,13 @@ function Invoke-FindGroupTrustUsers {
     )
 
     if(-not $Domain){
-        $Domain = (Get-NetDomain).Name
+        $DomainObj = Get-NetDomain
+    }
+    else{
+        $DomainObj = Get-NetDomain -Domain $Domain
     }
 
-    $DomainDN = "DC=$($Domain.Replace('.', ',DC='))"
+    $DomainDN = $DomainObj.GetDirectoryEntry().distinguishedName
     write-verbose "DomainDN: $DomainDN"
 
     # standard group names to ignore
@@ -10747,7 +10751,7 @@ function Invoke-FindAllUserTrustGroups {
     $domains = New-Object System.Collections.Stack
 
     # get the current domain and push it onto the stack
-    $currentDomain = (([adsi]'').distinguishedname -replace 'DC=','' -replace ',','.')[0]
+    $currentDomain = (Get-NetDomain).Name
     $domains.push($currentDomain)
 
     while($domains.Count -ne 0){
@@ -10813,7 +10817,7 @@ function Invoke-FindAllGroupTrustUsers {
     $domains = New-Object System.Collections.Stack
 
     # get the current domain and push it onto the stack
-    $currentDomain = (([adsi]'').distinguishedname -replace 'DC=','' -replace ',','.')[0]
+    $currentDomain = (Get-NetDomain).Name
     $domains.push($currentDomain)
 
     while($domains.Count -ne 0){
